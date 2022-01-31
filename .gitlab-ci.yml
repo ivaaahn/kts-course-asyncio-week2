@@ -1,0 +1,39 @@
+stages:
+  - build
+  - configs
+
+variables:
+  DOCKER_BUILDKIT: "1"
+  IMAGE_REPO: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG
+  IMAGE: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_PIPELINE_IID
+
+docker:
+  stage: build
+  script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+    - docker build
+      --build-arg PIP_EXTRA_INDEX_URL
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from=$IMAGE_REPO:latest
+      -t $IMAGE
+      -t $IMAGE_REPO:latest .
+    - docker push $IMAGE
+    - docker push $IMAGE_REPO:latest
+
+.configs:
+  stage: configs
+  script:
+    - echo $KUBE_NAMESPACE
+    - kubectl create secret docker-registry registry-credentials --docker-server=${CI_REGISTRY} --docker-username=${CI_DEPLOY_USER} --docker-password=${CI_DEPLOY_PASSWORD} -o yaml --dry-run | kubectl apply -f -
+    - kubectl create configmap mercury-config --from-file=".mercury.yaml" -o yaml --dry-run=client | envsubst '$IMAGE' | kubectl apply -f -
+
+dev:
+  extends: .configs
+  environment:
+    name: dev
+
+prod:
+  extends: .configs
+  when: manual
+  environment:
+    name: mc1

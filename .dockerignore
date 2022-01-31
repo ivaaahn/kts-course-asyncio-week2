@@ -1,0 +1,7 @@
+.gitlab-ci.yml
+.mercury.yaml
+.git
+.pytest_cache
+.idea
+*.pyc
+env
